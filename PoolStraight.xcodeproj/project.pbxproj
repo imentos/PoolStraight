@@ -12,6 +12,11 @@
 		01MAIN000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000003 /* Assets.xcassets */; };
 		01MAIN000000000000000004 /* CameraService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000005 /* CameraService.swift */; };
 		01MAIN000000000000000005 /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000006 /* CameraView.swift */; };
+		01MAIN000000000000000006 /* PoseEstimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000007 /* PoseEstimator.swift */; };
+		01MAIN000000000000000007 /* AlignmentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000008 /* AlignmentStatus.swift */; };
+		01MAIN000000000000000008 /* OverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000009 /* OverlayView.swift */; };
+		01MAIN000000000000000009 /* AlignmentLogic.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000010 /* AlignmentLogic.swift */; };
+		01MAIN000000000000000010 /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02MAIN000000000000000011 /* AudioService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +27,11 @@
 		02MAIN000000000000000004 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		02MAIN000000000000000005 /* CameraService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraService.swift; sourceTree = "<group>"; };
 		02MAIN000000000000000006 /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
+		02MAIN000000000000000007 /* PoseEstimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseEstimator.swift; sourceTree = "<group>"; };
+		02MAIN000000000000000008 /* AlignmentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlignmentStatus.swift; sourceTree = "<group>"; };
+		02MAIN000000000000000009 /* OverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverlayView.swift; sourceTree = "<group>"; };
+		02MAIN000000000000000010 /* AlignmentLogic.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlignmentLogic.swift; sourceTree = "<group>"; };
+		02MAIN000000000000000011 /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -50,6 +60,11 @@
 				02MAIN000000000000000002 /* ContentView.swift */,
 				02MAIN000000000000000005 /* CameraService.swift */,
 				02MAIN000000000000000006 /* CameraView.swift */,
+				02MAIN000000000000000007 /* PoseEstimator.swift */,
+				02MAIN000000000000000008 /* AlignmentStatus.swift */,
+				02MAIN000000000000000009 /* OverlayView.swift */,
+				02MAIN000000000000000010 /* AlignmentLogic.swift */,
+				02MAIN000000000000000011 /* AudioService.swift */,
 				02MAIN000000000000000003 /* Assets.xcassets */,
 				02MAIN000000000000000004 /* Info.plist */,
 			);
@@ -137,6 +152,11 @@
 				01MAIN000000000000000001 /* PoolStraightApp.swift in Sources */,
 				01MAIN000000000000000004 /* CameraService.swift in Sources */,
 				01MAIN000000000000000005 /* CameraView.swift in Sources */,
+				01MAIN000000000000000006 /* PoseEstimator.swift in Sources */,
+				01MAIN000000000000000007 /* AlignmentStatus.swift in Sources */,
+				01MAIN000000000000000008 /* OverlayView.swift in Sources */,
+				01MAIN000000000000000009 /* AlignmentLogic.swift in Sources */,
+				01MAIN000000000000000010 /* AudioService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
