@@ -21,9 +21,9 @@ struct AlignmentLogic {
         
         var headTiltThreshold: Double {
             switch self {
-            case .beginner: return 15.0      // ±15 degrees head tilt allowed
-            case .intermediate: return 10.0  // ±10 degrees head tilt allowed
-            case .advanced: return 6.0       // ±6 degrees head tilt allowed
+            case .beginner: return 8.0       // ±8 degrees head tilt allowed (more strict)
+            case .intermediate: return 5.0   // ±5 degrees head tilt allowed 
+            case .advanced: return 3.0       // ±3 degrees head tilt allowed (very strict)
             }
         }
         
