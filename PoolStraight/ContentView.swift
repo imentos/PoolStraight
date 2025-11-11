@@ -68,9 +68,11 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
     }
     
     private func handleAlignmentStatusChange(from previous: AlignmentStatus, to current: AlignmentStatus) {
+        print("🔄 Alignment change: \(previous) → \(current)")
+        
         switch current {
         case .aligned:
-            if previous == .misaligned {
+            if previous == .misaligned || previous == .notDetected {
                 audioService.playAlignmentSound()
                 print("🎵 Alignment achieved! Playing success sound")
             }
@@ -81,6 +83,7 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
             }
         case .notDetected:
             // No sound for detection loss
+            print("🔇 No pose detected - no sound")
             break
         }
     }
