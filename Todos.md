@@ -113,7 +113,6 @@ The goal of this phase is to analyze the detected points and provide real-time v
     - [ ] Draw the line connecting the elbow and wrist.
     - [ ] The color of the line and points should be green for `.aligned` and red for `.misaligned`.
     - [ ] Do not draw the line or points if the status is `.notDetected`.
-- [ ] In `ContentView`, add a `Text("Position Not Detected")` view that is only visible when `alignmentStatus` is `.notDetected`.
 
 ### 3.3 Audio Feedback (`AudioService.swift`)
 - [ ] Create two short sound files: `aligned.wav` (positive) and `misaligned.wav` (alert).
@@ -147,7 +146,6 @@ The goal of this phase is to finalize the app's configuration, perform thorough 
 - [ ] **Functional Test:** Verify pose points for elbow and wrist are accurately detected and rendered.
 - [ ] **Functional Test:** Confirm overlay line color correctly switches between green and red based on alignment.
 - [ ] **Functional Test:** Confirm audio cues trigger correctly and only on a change of alignment state.
-- [ ] **Functional Test:** Verify the "Position Not Detected" indicator appears when a hand is occluded or out of frame and disappears when visible again.
 - [x] **Usability Test:** Ensure the front-facing camera view feels natural and mirrored for the user. (✅ Fixed: Using left joints in pose detection to handle mirrored camera)
 - [ ] **Performance Test:** Run the app and confirm the UI remains smooth and responsive (e.g., 30+ FPS).
 - [ ] **Edge Case Test:** Test performance in standard indoor lighting conditions.

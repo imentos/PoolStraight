@@ -34,8 +34,6 @@ Red line when misaligned
 
 Joint points highlighted when detected.
 
-Visual indicator when detection fails (e.g., “position not detected”).
-
 Feedback is continuous while the player is correctly lined up.
 
 3.3 Audio Feedback
@@ -99,8 +97,6 @@ Fixed center line displayed for reference
 
 Feedback colors: green/red
 
-Visual indicator for failed detection
-
 5. Data Handling
 
 No user data stored
@@ -111,11 +107,11 @@ Temporary in-memory processing of camera feed and keypoints
 
 6. Error Handling & Edge Cases
 
-Detection Failure: display visual indicator; no feedback given
+Detection Failure: no feedback given
 
 Key Point Missing: pause alignment feedback until detected
 
-Low Light or Occlusion: same as above, display indicator
+Low Light or Occlusion: same as above
 
 Device Orientation Locked: ignore rotation
 
@@ -127,8 +123,6 @@ Verify pose detection accuracy for elbow → wrist → cue tip
 Confirm real-time overlay line color changes correctly based on alignment
 
 Validate audio feedback triggers correctly for aligned and misaligned positions
-
-Test visual detection failure indicator when key points are not visible
 
 7.2 Usability Tests
 
@@ -177,8 +171,6 @@ Pose estimation integration for elbow, wrist, cue tip
 Real-time visual overlay system (lines + joint points + center line)
 
 Audio feedback system (misaligned alert + positive alignment cue)
-
-Visual failure indicator when detection fails
 
 Portrait-only, single-player setup
 
