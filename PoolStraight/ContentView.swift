@@ -2,7 +2,7 @@ import SwiftUI
 import AVFoundation
 
 struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
-    @State private var isSessionActive = false
+    @State private var isSessionActive = true // Always active; auto-start
     @StateObject private var cameraService = CameraService()
     @StateObject private var poseEstimator = PoseEstimator()
     @StateObject private var audioService = AudioService()
@@ -25,61 +25,17 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
                 )
                 .ignoresSafeArea()
                 
-                // Detection status indicator
-                if alignmentStatus == .notDetected {
-                    VStack {
-                        Text("Position Not Detected")
-                            .font(.title3)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(12)
-                        Spacer()
-                    }
-                    .padding(.top, 100)
-                }
-                
-                VStack {
-                    Spacer()
-                    
-                    Button(action: {
-                        isSessionActive.toggle()
-                        if isSessionActive {
-                            print("🎬 Starting camera and pose detection...")
-                            cameraService.startSession()
-                            poseEstimator.startDetection()
-                            // Reset previous state for audio feedback
-                            previousAlignmentStatus = .notDetected
-                        } else {
-                            print("⏹️ Stopping camera and pose detection...")
-                            cameraService.stopSession()
-                            poseEstimator.stopDetection()
-                            audioService.stopAllSounds()
-                            // Reset states
-                            detectedPoints = []
-                            alignmentStatus = .notDetected
-                            previousAlignmentStatus = .notDetected
-                        }
-                    }) {
-                        Text(isSessionActive ? "Stop Practice" : "Start Practice")
-                            .font(.title2)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .padding()
-                            .frame(maxWidth: .infinity)
-                            .background(isSessionActive ? Color.red : Color.green)
-                            .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 40)
-                    .padding(.bottom, 50)
-                }
+                // Removed start/stop button and not detected banner per user request
             }
         }
         .onAppear {
             cameraService.delegate = self
             poseEstimator.delegate = self
             requestCameraPermission()
+            // Auto-start session
+            cameraService.startSession()
+            poseEstimator.startDetection()
+            previousAlignmentStatus = .notDetected
         }
     }
     

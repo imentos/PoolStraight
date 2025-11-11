@@ -64,6 +64,17 @@ class CameraService: NSObject, ObservableObject {
 
 extension CameraService: AVCaptureVideoDataOutputSampleBufferDelegate {
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        // Set video rotation for iOS 17+ compatibility
+        if #available(iOS 17.0, *) {
+            connection.videoRotationAngle = 0 // Portrait orientation
+        } else {
+            connection.videoOrientation = .portrait
+        }
+        
+        if connection.isVideoMirroringSupported {
+            connection.isVideoMirrored = true
+        }
+        
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }

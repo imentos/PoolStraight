@@ -180,8 +180,6 @@ Audio feedback system (misaligned alert + positive alignment cue)
 
 Visual failure indicator when detection fails
 
-Manual start/stop practice button
-
 Portrait-only, single-player setup
 
 Testing scripts for alignment, performance, and usability

@@ -18,6 +18,11 @@ class PoseEstimator: ObservableObject {
     private var lastProcessTime: TimeInterval = 0
     private let processingInterval: TimeInterval = 1.0 / 15.0 // 15 FPS for pose detection
     private var isDetecting = false
+
+    // Track last buffer dimensions to infer orientation / rotation
+    private var lastBufferWidth: Int = 0
+    private var lastBufferHeight: Int = 0
+    private var debugCounter: Int = 0
     
     init() {
         setupVisionRequest()
@@ -45,6 +50,10 @@ class PoseEstimator: ObservableObject {
         
         // Only process if detection is active
         guard isDetecting, let request = poseRequest else { return }
+
+    // Capture current buffer dimensions (used for orientation heuristics)
+    lastBufferWidth = CVPixelBufferGetWidth(buffer)
+    lastBufferHeight = CVPixelBufferGetHeight(buffer)
         
         // Perform pose detection on background queue
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -76,15 +85,42 @@ class PoseEstimator: ObservableObject {
             
             // Check confidence levels
             if rightElbow.confidence > 0.5 && rightWrist.confidence > 0.5 {
-                // Convert from Vision coordinates (bottom-left origin) to normalized coordinates (top-left origin)
-                let elbowPoint = CGPoint(x: rightElbow.location.x, y: 1.0 - rightElbow.location.y)
-                let wristPoint = CGPoint(x: rightWrist.location.x, y: 1.0 - rightWrist.location.y)
-                
+                // Adaptive transform attempting to correct axis swap / rotation issues.
+                // Heuristic: If bufferWidth > bufferHeight (common for portrait capture returning landscape buffer), swap axes.
+                let shouldSwapAxes = lastBufferWidth > lastBufferHeight
+
+                func transformPoint(_ p: VNRecognizedPoint) -> CGPoint {
+                    var x = p.location.x
+                    var y = p.location.y
+
+                    // If axes are swapped due to buffer orientation, swap first.
+                    if shouldSwapAxes {
+                        let tmp = x
+                        x = y
+                        y = tmp
+                    }
+
+                    // Vision origin is bottom-left; convert to top-left by flipping Y.
+                    y = 1.0 - y
+
+                    // Mirror horizontally for front camera (so movement feels natural like a mirror).
+                    x = 1.0 - x
+
+                    return CGPoint(x: x, y: y)
+                }
+
+                let elbowPoint = transformPoint(rightElbow)
+                let wristPoint = transformPoint(rightWrist)
                 landmarks = [elbowPoint, wristPoint]
-                
-                // Log occasionally for debugging
-                if Int.random(in: 1...45) == 1 {
-                    print("🔍 Vision pose detected: Elbow(\(String(format: "%.2f", elbowPoint.x)), \(String(format: "%.2f", elbowPoint.y))) Wrist(\(String(format: "%.2f", wristPoint.x)), \(String(format: "%.2f", wristPoint.y)))")
+
+                // Structured debug logging every ~30 frames
+                debugCounter += 1
+                if debugCounter % 30 == 0 {
+                    let rawElbow = rightElbow.location
+                    let rawWrist = rightWrist.location
+                    print("� Transform Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)" +
+                          "\n    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))" +
+                          "\n    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
                 }
             }
             
