@@ -84,54 +84,20 @@ class PoseEstimator: ObservableObject {
             let leftElbow = try firstPose.recognizedPoint(.leftElbow)
             let leftWrist = try firstPose.recognizedPoint(.leftWrist)
             
-            // Get head landmarks for tilt detection AND as shoulder fallback when leaning
+            // Get head landmarks for tilt detection
             let leftEye = try firstPose.recognizedPoint(.leftEye)
             let rightEye = try firstPose.recognizedPoint(.rightEye)
             let nose = try firstPose.recognizedPoint(.nose)
             
-            // Enhanced detection for billiard stance: use eyes as shoulder reference when leaning
-            var shoulderConfidence: Float
-            var useEyeBasedShoulder = false
-            
-            // When players lean down, eyes might be more reliable than shoulder/neck
-            if leftShoulder.confidence > 0.5 {
-                // Normal upright pose - use shoulder
-                shoulderConfidence = leftShoulder.confidence
-                useEyeBasedShoulder = false
-            } else if leftEye.confidence > 0.4 && rightEye.confidence > 0.4 {
-                // Leaning pose - use eye position as upper body reference
-                shoulderConfidence = (leftEye.confidence + rightEye.confidence) / 2
-                useEyeBasedShoulder = true
-                
-                print("🎱 Billiard lean detected - using eye-based shoulder estimation (conf: \(String(format: "%.3f", shoulderConfidence)))")
-            } else {
-                // Fallback to original shoulder even with low confidence
-                shoulderConfidence = leftShoulder.confidence
-                useEyeBasedShoulder = false
-            }
-            
-            // Check confidence levels - more lenient for billiard stance
-            if shoulderConfidence > 0.3 && leftWrist.confidence > 0.3 {
+            // Check confidence levels - require shoulder and wrist, elbow and head optional
+            if leftShoulder.confidence > 0.5 && leftWrist.confidence > 0.5 {
                 // Adaptive transform attempting to correct axis swap / rotation issues.
                 // Heuristic: If bufferWidth > bufferHeight (common for portrait capture returning landscape buffer), swap axes.
                 let shouldSwapAxes = lastBufferWidth > lastBufferHeight
 
-                func transformPoint(_ p: VNRecognizedPoint, isShoulderPoint: Bool = false) -> CGPoint {
-                    var x: CGFloat
-                    var y: CGFloat
-                    
-                    if isShoulderPoint && useEyeBasedShoulder && leftEye.confidence > 0.4 && rightEye.confidence > 0.4 {
-                        // Use eye-based estimation for shoulder position
-                        let averageEyeX = (leftEye.location.x + rightEye.location.x) / 2
-                        let averageEyeY = (leftEye.location.y + rightEye.location.y) / 2
-                        let estimatedShoulderY = averageEyeY - 0.12 // 12% below eyes
-                        
-                        x = averageEyeX
-                        y = estimatedShoulderY
-                    } else {
-                        x = p.location.x
-                        y = p.location.y
-                    }
+                func transformPoint(_ p: VNRecognizedPoint) -> CGPoint {
+                    var x = p.location.x
+                    var y = p.location.y
 
                     // If axes are swapped due to buffer orientation, swap first.
                     if shouldSwapAxes {
@@ -149,14 +115,13 @@ class PoseEstimator: ObservableObject {
                     return CGPoint(x: x, y: y)
                 }
 
-                // Use eye estimation for shoulder if we're in lean mode
-                let shoulderPoint = transformPoint(leftShoulder, isShoulderPoint: true)
+                let shoulderPoint = transformPoint(leftShoulder)
                 let wristPoint = transformPoint(leftWrist)
                 
-                var detectedPoints: [CGPoint] = [shoulderPoint] // Always start with shoulder (or eye-estimated shoulder)
+                var detectedPoints: [CGPoint] = [shoulderPoint] // Always start with shoulder
                 
-                // Add elbow if detected with good confidence (more lenient for leaning pose)
-                if leftElbow.confidence > 0.3 {
+                // Add elbow if detected with good confidence
+                if leftElbow.confidence > 0.5 {
                     let elbowPoint = transformPoint(leftElbow)
                     detectedPoints.append(elbowPoint)
                 }
@@ -180,28 +145,18 @@ class PoseEstimator: ObservableObject {
                 
                 landmarks = detectedPoints
 
-                // Enhanced debug logging for billiard stance
+                // Structured debug logging every ~30 frames
                 debugCounter += 1
                 if debugCounter % 30 == 0 {
                     let rawShoulder = leftShoulder.location
                     let rawWrist = leftWrist.location
-                    print("🎯 Enhanced Billiard Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)")
-                    
-                    if useEyeBasedShoulder {
-                        print("    Using EYE-BASED shoulder estimation for leaning pose")
-                        print("    Left Eye conf: \(String(format: "%.3f", leftEye.confidence)), Right Eye conf: \(String(format: "%.3f", rightEye.confidence))")
-                        print("    Shoulder conf: \(String(format: "%.3f", leftShoulder.confidence)) (too low, using eyes)")
-                    } else {
-                        print("    Using standard shoulder detection")
-                        print("    Shoulder conf: \(String(format: "%.3f", shoulderConfidence))")
-                    }
-                    
+                    print("🎯 Transform Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)")
                     print("    Raw Shoulder(x: \(String(format: "%.3f", rawShoulder.x)), y: \(String(format: "%.3f", rawShoulder.y))) → Transformed(x: \(String(format: "%.3f", shoulderPoint.x)), y: \(String(format: "%.3f", shoulderPoint.y)))")
                     print("    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
                     
-                    var detectionMode = useEyeBasedShoulder ? "Eye-Based Shoulder+Wrist" : "Standard Shoulder+Wrist"
-                    if leftElbow.confidence > 0.3 {
-                        detectionMode = useEyeBasedShoulder ? "Eye-Based 3-point (E-S+E+W)" : "Standard 3-point (S+E+W)"
+                    var detectionMode = "Shoulder+Wrist"
+                    if leftElbow.confidence > 0.5 {
+                        detectionMode = "3-point (S+E+W)"
                         let rawElbow = leftElbow.location
                         let elbowPoint = transformPoint(leftElbow)
                         print("    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))")
@@ -223,13 +178,6 @@ class PoseEstimator: ObservableObject {
                     
                     print("    Detection mode: \(detectionMode)")
                 }
-            } else {
-                // Log why detection failed with billiard context
-                print("⚠️ Billiard pose detection failed:")
-                print("   Shoulder conf: \(String(format: "%.3f", leftShoulder.confidence))")
-                print("   Eye-based conf: \(leftEye.confidence > 0.4 && rightEye.confidence > 0.4 ? String(format: "%.3f", (leftEye.confidence + rightEye.confidence) / 2) : "N/A")")
-                print("   Wrist conf: \(String(format: "%.3f", leftWrist.confidence))")
-                print("   Try adjusting lighting or lean angle slightly")
             }
             
         } catch {
