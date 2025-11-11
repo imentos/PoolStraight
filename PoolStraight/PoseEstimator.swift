@@ -79,12 +79,12 @@ class PoseEstimator: ObservableObject {
         var landmarks: [CGPoint] = []
         
         do {
-            // Get right elbow and right wrist (for right-handed players)
-            let rightElbow = try firstPose.recognizedPoint(.rightElbow)
-            let rightWrist = try firstPose.recognizedPoint(.rightWrist)
+            // Get left elbow and left wrist (which will appear as right side after mirroring for right-handed players)
+            let leftElbow = try firstPose.recognizedPoint(.leftElbow)
+            let leftWrist = try firstPose.recognizedPoint(.leftWrist)
             
             // Check confidence levels
-            if rightElbow.confidence > 0.5 && rightWrist.confidence > 0.5 {
+            if leftElbow.confidence > 0.5 && leftWrist.confidence > 0.5 {
                 // Adaptive transform attempting to correct axis swap / rotation issues.
                 // Heuristic: If bufferWidth > bufferHeight (common for portrait capture returning landscape buffer), swap axes.
                 let shouldSwapAxes = lastBufferWidth > lastBufferHeight
@@ -109,15 +109,15 @@ class PoseEstimator: ObservableObject {
                     return CGPoint(x: x, y: y)
                 }
 
-                let elbowPoint = transformPoint(rightElbow)
-                let wristPoint = transformPoint(rightWrist)
+                let elbowPoint = transformPoint(leftElbow)
+                let wristPoint = transformPoint(leftWrist)
                 landmarks = [elbowPoint, wristPoint]
 
                 // Structured debug logging every ~30 frames
                 debugCounter += 1
                 if debugCounter % 30 == 0 {
-                    let rawElbow = rightElbow.location
-                    let rawWrist = rightWrist.location
+                    let rawElbow = leftElbow.location
+                    let rawWrist = leftWrist.location
                     print("� Transform Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)" +
                           "\n    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))" +
                           "\n    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
