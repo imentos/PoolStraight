@@ -37,8 +37,14 @@ struct OverlayView: View {
     private func drawLandmarks(context: GraphicsContext, size: CGSize) {
         guard detectedPoints.count >= 2 else { return }
         
-        let elbow = convertNormalizedPoint(detectedPoints[0], to: size)
-        let wrist = convertNormalizedPoint(detectedPoints[1], to: size)
+        // Determine configuration: 2 points (shoulder, wrist) or 3 points (shoulder, elbow, wrist)
+        let hasShoulder = true // First point is always shoulder
+        let hasElbow = detectedPoints.count >= 3
+        let hasWrist = true // Wrist is always present
+        
+        let shoulder = convertNormalizedPoint(detectedPoints[0], to: size)
+        let elbow = hasElbow ? convertNormalizedPoint(detectedPoints[1], to: size) : nil
+        let wrist = convertNormalizedPoint(hasElbow ? detectedPoints[2] : detectedPoints[1], to: size)
         
         // Choose color based on alignment status
         let pointColor: Color
@@ -56,32 +62,73 @@ struct OverlayView: View {
             lineColor = .gray
         }
         
-        // Draw connection line between elbow and wrist
-        var linePath = Path()
-        linePath.move(to: elbow)
-        linePath.addLine(to: wrist)
+        // Draw main alignment line (shoulder to wrist) - this is always the primary reference
+        var mainLinePath = Path()
+        mainLinePath.move(to: shoulder)
+        mainLinePath.addLine(to: wrist)
         
         context.stroke(
-            linePath,
+            mainLinePath,
             with: .color(lineColor),
-            style: StrokeStyle(lineWidth: 4, lineCap: .round)
+            style: StrokeStyle(lineWidth: 6, lineCap: .round)
         )
         
-        // Draw elbow point (larger and more visible)
+        // If elbow is detected, draw the arm segments with thinner lines
+        if let elbow = elbow {
+            // Draw shoulder-to-elbow segment (dimmed)
+            var shoulderElbowPath = Path()
+            shoulderElbowPath.move(to: shoulder)
+            shoulderElbowPath.addLine(to: elbow)
+            
+            context.stroke(
+                shoulderElbowPath,
+                with: .color(lineColor.opacity(0.6)),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+            
+            // Draw elbow-to-wrist segment (dimmed)
+            var elbowWristPath = Path()
+            elbowWristPath.move(to: elbow)
+            elbowWristPath.addLine(to: wrist)
+            
+            context.stroke(
+                elbowWristPath,
+                with: .color(lineColor.opacity(0.6)),
+                style: StrokeStyle(lineWidth: 3, lineCap: .round)
+            )
+        }
+        
+        // Draw shoulder point
         context.fill(
             Path(ellipseIn: CGRect(
-                x: elbow.x - 12,
-                y: elbow.y - 12,
-                width: 24,
-                height: 24
+                x: shoulder.x - 10,
+                y: shoulder.y - 10,
+                width: 20,
+                height: 20
             )),
             with: .color(pointColor)
         )
         
-        // Draw elbow label
-        context.draw(Text("ELBOW").font(.caption).bold().foregroundColor(.white), at: CGPoint(x: elbow.x, y: elbow.y - 30))
+        // Draw shoulder label
+        context.draw(Text("SHOULDER").font(.caption).bold().foregroundColor(.white), at: CGPoint(x: shoulder.x, y: shoulder.y - 25))
         
-        // Draw wrist point (slightly larger since it's more important for cue alignment)
+        // Draw elbow point if detected
+        if let elbow = elbow {
+            context.fill(
+                Path(ellipseIn: CGRect(
+                    x: elbow.x - 8,
+                    y: elbow.y - 8,
+                    width: 16,
+                    height: 16
+                )),
+                with: .color(pointColor.opacity(0.8))
+            )
+            
+            // Draw elbow label
+            context.draw(Text("ELBOW").font(.caption2).foregroundColor(.white.opacity(0.8)), at: CGPoint(x: elbow.x + 20, y: elbow.y))
+        }
+        
+        // Draw wrist point (most important for cue alignment)
         context.fill(
             Path(ellipseIn: CGRect(
                 x: wrist.x - 15,
@@ -94,6 +141,14 @@ struct OverlayView: View {
         
         // Draw wrist label with cue indication
         context.draw(Text("CUE GRIP").font(.caption).bold().foregroundColor(.white), at: CGPoint(x: wrist.x, y: wrist.y + 35))
+        
+        // Add detection mode indicator
+        let modeText = hasElbow ? "3-POINT" : "2-POINT"
+        let modeColor = hasElbow ? Color.blue : Color.orange
+        context.draw(
+            Text(modeText).font(.caption2).bold().foregroundColor(modeColor),
+            at: CGPoint(x: size.width - 60, y: 30)
+        )
     }
     
     private func convertNormalizedPoint(_ normalizedPoint: CGPoint, to size: CGSize) -> CGPoint {

@@ -39,42 +39,100 @@ struct AlignmentLogic {
     // Current sensitivity level - can be adjusted during testing
     static var currentSensitivity: SensitivityLevel = .beginner
     
-    /// Calculates alignment status based on elbow and wrist positions relative to center line
+    /// Calculates alignment status based on shoulder, elbow (optional), and wrist positions
     /// - Parameters:
-    ///   - points: Array containing elbow (index 0) and wrist (index 1) coordinates (normalized 0-1)
+    ///   - points: Array containing shoulder (index 0), optionally elbow (index 1), and wrist (index 1 or 2) coordinates (normalized 0-1)
     ///   - centerLineX: X-coordinate of the center line (normalized, typically 0.5)
     ///   - sensitivity: Optional sensitivity override
     /// - Returns: AlignmentStatus indicating if the arm alignment is correct
     static func calculateAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5, sensitivity: SensitivityLevel? = nil) -> AlignmentStatus {
         
-        // Check if we have at least two points (elbow and wrist)
+        // Check if we have at least two points (shoulder and wrist minimum)
         guard points.count >= 2 else {
             return .notDetected
         }
         
-        let elbow = points[0]
-        let wrist = points[1]
+        let shoulder = points[0]
+        let hasElbow = points.count >= 3
+        let wrist = hasElbow ? points[2] : points[1] // Wrist is at index 2 if elbow present, index 1 otherwise
         
         // Ensure points are reasonable (within bounds)
-        guard isValidPoint(elbow) && isValidPoint(wrist) else {
+        guard isValidPoint(shoulder) && isValidPoint(wrist) else {
             return .notDetected
         }
         
         // Use provided sensitivity or default
         let activeSensitivity = sensitivity ?? currentSensitivity
         
+        if hasElbow {
+            let elbow = points[1]
+            guard isValidPoint(elbow) else {
+                // Elbow invalid, fall back to shoulder-wrist calculation
+                return calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+            }
+            
+            // Use three-point calculation for better precision
+            return calculateThreePointAlignment(shoulder: shoulder, elbow: elbow, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        } else {
+            // Use two-point calculation (shoulder-wrist only)
+            return calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        }
+    }
+    
+    // MARK: - Helper Methods for Different Point Configurations
+    
+    private static func calculateTwoPointAlignment(shoulder: CGPoint, wrist: CGPoint, centerLineX: CGFloat, sensitivity: SensitivityLevel) -> AlignmentStatus {
         // Use combined approach: both angle and lateral deviation
-        let angleAlignment = calculateAngleAlignment(elbow: elbow, wrist: wrist, sensitivity: activeSensitivity)
-        let lateralAlignment = calculateLateralAlignment(elbow: elbow, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        let angleAlignment = calculateAngleAlignment(elbow: shoulder, wrist: wrist, sensitivity: sensitivity)
+        let lateralAlignment = calculateLateralAlignment(elbow: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: sensitivity)
         
         // For billiard training, prioritize angle over lateral position
-        // This matches real-world billiard technique where arm angle is more critical
         switch (angleAlignment, lateralAlignment) {
         case (.aligned, .aligned):
             return .aligned
         case (.aligned, .misaligned):
             // Good angle but off-center - still provide some positive feedback for beginners
-            return activeSensitivity == .beginner ? .aligned : .misaligned
+            return sensitivity == .beginner ? .aligned : .misaligned
+        case (.misaligned, _):
+            return .misaligned
+        case (.notDetected, _), (_, .notDetected):
+            return .notDetected
+        }
+    }
+    
+    private static func calculateThreePointAlignment(shoulder: CGPoint, elbow: CGPoint, wrist: CGPoint, centerLineX: CGFloat, sensitivity: SensitivityLevel) -> AlignmentStatus {
+        // Check that the three points form a reasonable arm configuration
+        // Ensure shoulder is above elbow, and elbow is above wrist (proper billiard stance)
+        guard shoulder.y < elbow.y && elbow.y < wrist.y else {
+            // Invalid arm configuration, fall back to shoulder-wrist
+            return calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: sensitivity)
+        }
+        
+        // Calculate alignment using the full arm configuration
+        // Use elbow-wrist for primary angle calculation (most important for cue alignment)
+        let primaryAngleAlignment = calculateAngleAlignment(elbow: elbow, wrist: wrist, sensitivity: sensitivity)
+        
+        // Use shoulder-elbow for secondary validation (arm posture)
+        let shoulderElbowAngleAlignment = calculateAngleAlignment(elbow: shoulder, wrist: elbow, sensitivity: sensitivity)
+        
+        // Calculate lateral alignment using all three points with proper weighting
+        let weightedX = (shoulder.x * 0.2) + (elbow.x * 0.3) + (wrist.x * 0.5) // Wrist most important
+        let lateralDeviation = abs(weightedX - centerLineX)
+        let lateralThreshold = sensitivity.lateralThreshold
+        let lateralAlignment: AlignmentStatus = lateralDeviation <= lateralThreshold ? .aligned : .misaligned
+        
+        // Debug logging for fine-tuning
+        if primaryAngleAlignment == .misaligned || lateralAlignment == .misaligned {
+            print("🎯 3-point alignment: primary=\(primaryAngleAlignment), shoulderElbow=\(shoulderElbowAngleAlignment), lateral=\(lateralAlignment)")
+        }
+        
+        // Combine results - prioritize the elbow-wrist alignment as it's most critical for cue positioning
+        switch (primaryAngleAlignment, lateralAlignment) {
+        case (.aligned, .aligned):
+            return .aligned
+        case (.aligned, .misaligned):
+            // Good cue angle but off-center
+            return sensitivity == .beginner ? .aligned : .misaligned
         case (.misaligned, _):
             return .misaligned
         case (.notDetected, _), (_, .notDetected):
@@ -174,17 +232,18 @@ struct AlignmentLogic {
     }
     
     /// Legacy method for simpler lateral-only alignment (kept for compatibility)
+    /// Note: This method expects the old 2-point format (elbow, wrist)
     static func calculateLateralAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5) -> AlignmentStatus {
         
         guard points.count >= 2 else {
             return .notDetected
         }
         
-        let elbow = points[0]
+        let firstPoint = points[0]  // Could be shoulder or elbow depending on detection
         let wrist = points[1]
         
-        // Calculate average X position of elbow and wrist
-        let averageX = (elbow.x + wrist.x) / 2
+        // Calculate average X position of first point and wrist
+        let averageX = (firstPoint.x + wrist.x) / 2
         
         // Calculate lateral deviation from center line
         let lateralDeviation = abs(averageX - centerLineX)

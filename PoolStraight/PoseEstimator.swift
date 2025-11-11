@@ -79,12 +79,13 @@ class PoseEstimator: ObservableObject {
         var landmarks: [CGPoint] = []
         
         do {
-            // Get left elbow and left wrist (which will appear as right side after mirroring for right-handed players)
+            // Get left shoulder, elbow and wrist (which will appear as right side after mirroring for right-handed players)
+            let leftShoulder = try firstPose.recognizedPoint(.leftShoulder)
             let leftElbow = try firstPose.recognizedPoint(.leftElbow)
             let leftWrist = try firstPose.recognizedPoint(.leftWrist)
             
-            // Check confidence levels
-            if leftElbow.confidence > 0.5 && leftWrist.confidence > 0.5 {
+            // Check confidence levels - require shoulder and wrist, elbow is optional
+            if leftShoulder.confidence > 0.5 && leftWrist.confidence > 0.5 {
                 // Adaptive transform attempting to correct axis swap / rotation issues.
                 // Heuristic: If bufferWidth > bufferHeight (common for portrait capture returning landscape buffer), swap axes.
                 let shouldSwapAxes = lastBufferWidth > lastBufferHeight
@@ -109,18 +110,35 @@ class PoseEstimator: ObservableObject {
                     return CGPoint(x: x, y: y)
                 }
 
-                let elbowPoint = transformPoint(leftElbow)
+                let shoulderPoint = transformPoint(leftShoulder)
                 let wristPoint = transformPoint(leftWrist)
-                landmarks = [elbowPoint, wristPoint]
+                
+                // Check if elbow is also detected with good confidence
+                if leftElbow.confidence > 0.5 {
+                    let elbowPoint = transformPoint(leftElbow)
+                    landmarks = [shoulderPoint, elbowPoint, wristPoint]
+                } else {
+                    // Elbow not detected, use just shoulder and wrist
+                    landmarks = [shoulderPoint, wristPoint]
+                }
 
                 // Structured debug logging every ~30 frames
                 debugCounter += 1
                 if debugCounter % 30 == 0 {
-                    let rawElbow = leftElbow.location
+                    let rawShoulder = leftShoulder.location
                     let rawWrist = leftWrist.location
-                    print("� Transform Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)" +
-                          "\n    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))" +
-                          "\n    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
+                    print("🎯 Transform Debug → buffer: \(lastBufferWidth)x\(lastBufferHeight) swapAxes=\(shouldSwapAxes)")
+                    print("    Raw Shoulder(x: \(String(format: "%.3f", rawShoulder.x)), y: \(String(format: "%.3f", rawShoulder.y))) → Transformed(x: \(String(format: "%.3f", shoulderPoint.x)), y: \(String(format: "%.3f", shoulderPoint.y)))")
+                    print("    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
+                    
+                    if leftElbow.confidence > 0.5 {
+                        let rawElbow = leftElbow.location
+                        let elbowPoint = transformPoint(leftElbow)
+                        print("    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))")
+                        print("    Using 3-point detection: Shoulder → Elbow → Wrist")
+                    } else {
+                        print("    Using 2-point detection: Shoulder → Wrist (elbow confidence: \(String(format: "%.2f", leftElbow.confidence)))")
+                    }
                 }
             }
             
