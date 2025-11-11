@@ -19,6 +19,14 @@ struct AlignmentLogic {
             }
         }
         
+        var headTiltThreshold: Double {
+            switch self {
+            case .beginner: return 15.0      // ±15 degrees head tilt allowed
+            case .intermediate: return 10.0  // ±10 degrees head tilt allowed
+            case .advanced: return 6.0       // ±6 degrees head tilt allowed
+            }
+        }
+        
         var lateralThreshold: CGFloat {
             switch self {
             case .beginner: return 0.12      // ±12% of screen width
@@ -39,12 +47,12 @@ struct AlignmentLogic {
     // Current sensitivity level - can be adjusted during testing
     static var currentSensitivity: SensitivityLevel = .beginner
     
-    /// Calculates alignment status based on shoulder, elbow (optional), and wrist positions
+    /// Calculates alignment status based on shoulder, elbow (optional), wrist, and head tilt
     /// - Parameters:
-    ///   - points: Array containing shoulder (index 0), optionally elbow (index 1), and wrist (index 1 or 2) coordinates (normalized 0-1)
+    ///   - points: Array containing arm points [shoulder, (elbow), wrist] + optional head points [leftEye, rightEye, (nose)]
     ///   - centerLineX: X-coordinate of the center line (normalized, typically 0.5)
     ///   - sensitivity: Optional sensitivity override
-    /// - Returns: AlignmentStatus indicating if the arm alignment is correct
+    /// - Returns: AlignmentStatus indicating if the overall alignment is correct
     static func calculateAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5, sensitivity: SensitivityLevel? = nil) -> AlignmentStatus {
         
         // Check if we have at least two points (shoulder and wrist minimum)
@@ -52,9 +60,54 @@ struct AlignmentLogic {
             return .notDetected
         }
         
-        let shoulder = points[0]
-        let hasElbow = points.count >= 3
-        let wrist = hasElbow ? points[2] : points[1] // Wrist is at index 2 if elbow present, index 1 otherwise
+        // Parse points into arm and head components
+        var armPoints: [CGPoint] = []
+        var headPoints: [CGPoint] = []
+        
+        // Identify arm vs head points based on typical detection patterns
+        // First point is always shoulder, then elbow (optional), then wrist
+        armPoints.append(points[0]) // shoulder
+        
+        if points.count == 2 {
+            // [shoulder, wrist]
+            armPoints.append(points[1])
+        } else if points.count == 3 {
+            // Could be [shoulder, elbow, wrist] or [shoulder, wrist, leftEye]
+            let secondY = points[1].y
+            let thirdY = points[2].y
+            
+            // If second point is above third, it's likely elbow-wrist
+            if secondY < thirdY {
+                armPoints.append(points[1]) // elbow
+                armPoints.append(points[2]) // wrist
+            } else {
+                armPoints.append(points[1]) // wrist
+                headPoints.append(points[2]) // leftEye
+            }
+        } else {
+            // Multiple points - separate arm from head
+            // Assume shoulder + elbow/wrist, then head landmarks
+            armPoints.append(points[1]) // elbow or wrist
+            
+            if points.count >= 3 && points[1].y < points[2].y {
+                armPoints.append(points[2]) // wrist
+                // Rest are head points
+                for i in 3..<points.count {
+                    headPoints.append(points[i])
+                }
+            } else {
+                // Second point is wrist, rest are head points
+                for i in 2..<points.count {
+                    headPoints.append(points[i])
+                }
+            }
+        }
+        
+        // Validate we have minimum arm points
+        guard armPoints.count >= 2 else { return .notDetected }
+        
+        let shoulder = armPoints[0]
+        let wrist = armPoints.last!
         
         // Ensure points are reasonable (within bounds)
         guard isValidPoint(shoulder) && isValidPoint(wrist) else {
@@ -64,18 +117,38 @@ struct AlignmentLogic {
         // Use provided sensitivity or default
         let activeSensitivity = sensitivity ?? currentSensitivity
         
-        if hasElbow {
-            let elbow = points[1]
-            guard isValidPoint(elbow) else {
-                // Elbow invalid, fall back to shoulder-wrist calculation
-                return calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        // Calculate arm alignment
+        let armAlignment: AlignmentStatus
+        if armPoints.count >= 3 {
+            let elbow = armPoints[1]
+            if isValidPoint(elbow) {
+                armAlignment = calculateThreePointAlignment(shoulder: shoulder, elbow: elbow, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+            } else {
+                armAlignment = calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
             }
-            
-            // Use three-point calculation for better precision
-            return calculateThreePointAlignment(shoulder: shoulder, elbow: elbow, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
         } else {
-            // Use two-point calculation (shoulder-wrist only)
-            return calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+            armAlignment = calculateTwoPointAlignment(shoulder: shoulder, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        }
+        
+        // Calculate head alignment if head points are available
+        if headPoints.count >= 2 {
+            let headAlignment = calculateHeadAlignment(headPoints: headPoints, sensitivity: activeSensitivity)
+            
+            // Combine arm and head alignment
+            switch (armAlignment, headAlignment) {
+            case (.aligned, .aligned):
+                return .aligned
+            case (.aligned, .misaligned):
+                // Good arm but head tilted - provide feedback for improvement
+                return activeSensitivity == .beginner ? .aligned : .misaligned
+            case (.misaligned, _):
+                return .misaligned // Arm alignment takes priority
+            case (.notDetected, _), (_, .notDetected):
+                return .notDetected
+            }
+        } else {
+            // No head detection available, use arm alignment only
+            return armAlignment
         }
     }
     
@@ -138,6 +211,44 @@ struct AlignmentLogic {
         case (.notDetected, _), (_, .notDetected):
             return .notDetected
         }
+    }
+    
+    private static func calculateHeadAlignment(headPoints: [CGPoint], sensitivity: SensitivityLevel) -> AlignmentStatus {
+        guard headPoints.count >= 2 else { return .notDetected }
+        
+        // Use first two points as left and right eyes
+        let leftEye = headPoints[0]
+        let rightEye = headPoints[1]
+        
+        // Validate head points
+        guard isValidPoint(leftEye) && isValidPoint(rightEye) else {
+            return .notDetected
+        }
+        
+        // Calculate head tilt angle
+        let eyeDeltaX = rightEye.x - leftEye.x
+        let eyeDeltaY = rightEye.y - leftEye.y
+        
+        // Calculate angle in degrees (0° = level head)
+        let headTiltRadians = atan2(eyeDeltaY, eyeDeltaX)
+        var headTiltDegrees = headTiltRadians * 180.0 / Double.pi
+        
+        // Normalize angle to [-90, 90] range for easier threshold checking
+        if headTiltDegrees > 90 {
+            headTiltDegrees = headTiltDegrees - 180
+        } else if headTiltDegrees < -90 {
+            headTiltDegrees = headTiltDegrees + 180
+        }
+        
+        let absoluteTilt = abs(headTiltDegrees)
+        let tiltThreshold = sensitivity.headTiltThreshold
+        
+        // Debug logging for fine-tuning
+        if absoluteTilt > tiltThreshold {
+            print("👁️ Head tilt: \(String(format: "%.1f", headTiltDegrees))° (threshold: ±\(tiltThreshold)°)")
+        }
+        
+        return absoluteTilt <= tiltThreshold ? .aligned : .misaligned
     }
     
     private static func calculateAngleAlignment(elbow: CGPoint, wrist: CGPoint, sensitivity: SensitivityLevel) -> AlignmentStatus {

@@ -37,14 +37,17 @@ The goal is to detect key body points from the camera feed and prepare to draw t
 The goal is to calculate the player's alignment and provide instant visual and audio feedback.
 
 *   **Chunk 3.1: Core Alignment Calculation**
-    *   **Step 3.1.1:** Create an `AlignmentLogic` utility that takes the coordinates of the elbow and wrist.
-    *   **Step 3.1.2:** Implement a function to calculate the angle of the line formed by these points relative to the vertical center line.
-    *   **Step 3.1.3:** Determine the alignment status (`aligned`, `misaligned`, `notDetected`) based on whether the angle is within the ±5° threshold and if the points are visible.
+    *   **Step 3.1.1:** Create an `AlignmentLogic` utility that takes the coordinates of shoulder, elbow (optional), wrist, and head points.
+    *   **Step 3.1.2:** Implement functions to calculate arm angle relative to vertical center line and head tilt angle.
+    *   **Step 3.1.3:** Determine alignment status (`aligned`, `misaligned`, `notDetected`) based on arm angle and head tilt thresholds.
+    *   **Step 3.1.4:** Add configurable sensitivity levels (beginner/intermediate/advanced) with appropriate thresholds for both arm and head alignment.
 
 *   **Chunk 3.2: Dynamic Visual Feedback**
-    *   **Step 3.2.1:** Enhance the `OverlayView` to draw a line connecting the elbow and wrist points.
-    *   **Step 3.2.2:** The color of this line should dynamically change based on the alignment status (green for `aligned`, red for `misaligned`).
-    *   **Step 3.2.3:** Implement a visual indicator (e.g., text) that shows "Position not detected" when the required landmarks are not found.
+    *   **Step 3.2.1:** Enhance the `OverlayView` to draw lines connecting the arm points (shoulder→elbow→wrist) and head level indicator.
+    *   **Step 3.2.2:** The color of arm lines should change based on alignment (green for aligned, red for misaligned).
+    *   **Step 3.2.3:** Head tilt indicator should show cyan for level head, orange for tilted head.
+    *   **Step 3.2.4:** Implement detection mode indicators showing "2-POINT", "3-POINT", or "3-POINT+HEAD" configurations.
+    *   **Step 3.2.5:** Add visual feedback for "Position not detected" when required landmarks are not found.
 
 *   **Chunk 3.3: Audio Feedback**
     *   **Step 3.3.1:** Create an `AudioService` to manage and play sound effects.

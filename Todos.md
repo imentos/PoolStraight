@@ -63,23 +63,29 @@ The goal of this phase is to detect body landmarks from the camera feed and draw
 - [ ] Add the `.task` model file to your Xcode project bundle.
 
 ### 2.2 Pose Estimator Service (`PoseEstimator.swift`)
-- [ ] Create a new Swift file named `PoseEstimator.swift`.
-- [ ] Define a `PoseEstimator` class.
-- [ ] Create a `PoseEstimatorDelegate` protocol with the method `didDetect(landmarks: [CGPoint])`.
-- [ ] Implement an `init()` method that sets up the `PoseLandmarker` using the bundled model file.
-- [ ] Implement a `processFrame(_ buffer: CVPixelBuffer)` method that:
-    - [ ] Converts the `CVPixelBuffer` to an `MPImage`.
-    - [ ] Calls the pose landmarker's `detect(image:)` method.
-    - [x] In the result callback, extracts the normalized coordinates for `.leftElbow`, `.leftWrist`, and `.leftHand` (mapped to RIGHT_* IDs to handle mirrored camera).
-    - [ ] Checks the `visibility` of each landmark.
-    - [ ] Calls the delegate with an array of `CGPoint`s if landmarks are visible, or an empty array if not.
+- [x] Create a new Swift file named `PoseEstimator.swift`.
+- [x] Define a `PoseEstimator` class.
+- [x] Create a `PoseEstimatorDelegate` protocol with the method `didDetect(landmarks: [CGPoint])`.
+- [x] Implement an `init()` method that sets up the Apple Vision framework pose detection.
+- [x] Implement a `processFrame(_ buffer: CVPixelBuffer)` method that:
+    - [x] Uses `VNDetectHumanBodyPoseRequest` to detect pose landmarks.
+    - [x] Extracts normalized coordinates for shoulder, elbow (optional), wrist, and head landmarks.
+    - [x] Handles camera mirroring for front-facing camera view.
+    - [x] Checks confidence levels of each landmark for reliability.
+    - [x] Calls the delegate with flexible point array: arm points + optional head points.
+    - [x] Provides fallback when elbow cannot be detected (uses shoulder-wrist only).
+    - [x] Includes head tilt detection using eye positions when available.
 
 ### 2.3 Visual Overlay (`OverlayView.swift`)
-- [ ] Create a new SwiftUI file named `OverlayView.swift`.
-- [ ] Define an `OverlayView` struct that takes `detectedPoints: [CGPoint]` and `geometryProxy: GeometryProxy` as inputs.
-- [ ] Use a `Canvas` as the view's body for custom drawing.
-- [ ] Inside the `Canvas`, draw a static, dashed, vertical line down the center of the view.
-- [ ] Implement drawing logic to render circles for each point in `detectedPoints`, scaled correctly using the `geometryProxy`.
+- [x] Create a new SwiftUI file named `OverlayView.swift`.
+- [x] Define an `OverlayView` struct that takes `detectedPoints: [CGPoint]` and alignment status as inputs.
+- [x] Use a `Canvas` as the view's body for custom drawing.
+- [x] Inside the `Canvas`, draw a static, dashed, vertical center line for cue alignment reference.
+- [x] Implement drawing logic for flexible point configurations (2-point, 3-point, 3-point+head).
+- [x] Draw arm alignment: thick shoulder→wrist line (primary) + dimmed elbow segments (secondary).
+- [x] Draw head tilt indicator: eye-to-eye line with color coding (cyan=level, orange=tilted).
+- [x] Add detection mode indicators showing current pose detection configuration.
+- [x] Color-coded feedback: green=aligned, red=misaligned, cyan=head level, orange=head tilted.
 
 ### 2.4 Integration
 - [ ] In `ContentView`, create an instance of `PoseEstimator` as a `@StateObject`.
@@ -98,21 +104,27 @@ The goal of this phase is to detect body landmarks from the camera feed and draw
 The goal of this phase is to analyze the detected points and provide real-time visual and audio feedback to the user.
 
 ### 3.1 Alignment Logic (`AlignmentLogic.swift`)
-- [ ] Create a new Swift file named `AlignmentLogic.swift`.
-- [ ] Define a public `enum AlignmentStatus { case aligned, misaligned, notDetected }`.
-- [ ] Create a `struct AlignmentLogic` with a static function `calculateAlignment(points: [CGPoint]) -> AlignmentStatus`.
-- [ ] Inside the function, handle the case where fewer than two points are detected, returning `.notDetected`.
-- [ ] Calculate the angle of the line between the two points relative to a vertical line.
-- [ ] Return `.aligned` if the angle deviation is within ±5 degrees; otherwise, return `.misaligned`.
+- [x] Create a new Swift file named `AlignmentLogic.swift`.
+- [x] Define an `AlignmentStatus` enum with values `.aligned`, `.misaligned`, and `.notDetected`.
+- [x] Create a static function `calculateAlignment(points: [CGPoint], centerLineX: CGFloat) -> AlignmentStatus`.
+- [x] Handle flexible point configurations: 2-point (shoulder-wrist), 3-point (shoulder-elbow-wrist), and head detection.
+- [x] Calculate arm angle relative to vertical center line with configurable sensitivity levels.
+- [x] Add head tilt calculation using eye positions to ensure level head for proper billiard stance.
+- [x] Implement sensitivity levels: beginner (±12° arm, ±15° head), intermediate (±8° arm, ±10° head), advanced (±5° arm, ±6° head).
+- [x] Combine arm and head alignment for overall feedback with appropriate prioritization.
+- [x] Return alignment status considering both arm position and head tilt when available.
 
 ### 3.2 Dynamic Visual Feedback
-- [ ] In `ContentView`, add `@State private var alignmentStatus: AlignmentStatus = .notDetected`.
-- [ ] In the `didDetect` delegate method, use the result to call `AlignmentLogic.calculateAlignment` and update the `alignmentStatus`.
-- [ ] Pass the `alignmentStatus` to `OverlayView`.
-- [ ] In `OverlayView`, modify the drawing logic:
-    - [ ] Draw the line connecting the elbow and wrist.
-    - [ ] The color of the line and points should be green for `.aligned` and red for `.misaligned`.
-    - [ ] Do not draw the line or points if the status is `.notDetected`.
+- [x] In `ContentView`, add `@State private var alignmentStatus: AlignmentStatus = .notDetected`.
+- [x] In the `didDetect` delegate method, use result to call `AlignmentLogic.calculateAlignment` and update `alignmentStatus`.
+- [x] Pass the `alignmentStatus` to `OverlayView`.
+- [x] In `OverlayView`, implement comprehensive drawing logic:
+    - [x] Draw primary shoulder→wrist alignment line (thick, color-coded).
+    - [x] Draw secondary elbow segments when available (dimmed).
+    - [x] Draw head level indicator when head landmarks detected (cyan=level, orange=tilted).
+    - [x] Color coding: green for arm aligned, red for misaligned, appropriate head tilt colors.
+    - [x] Detection mode indicators showing current pose configuration.
+    - [x] Handle "Position not detected" cases gracefully.
 
 ### 3.3 Audio Feedback (`AudioService.swift`)
 - [ ] Create two short sound files: `aligned.wav` (positive) and `misaligned.wav` (alert).

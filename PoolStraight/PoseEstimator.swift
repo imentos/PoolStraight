@@ -84,7 +84,12 @@ class PoseEstimator: ObservableObject {
             let leftElbow = try firstPose.recognizedPoint(.leftElbow)
             let leftWrist = try firstPose.recognizedPoint(.leftWrist)
             
-            // Check confidence levels - require shoulder and wrist, elbow is optional
+            // Get head landmarks for tilt detection
+            let leftEye = try firstPose.recognizedPoint(.leftEye)
+            let rightEye = try firstPose.recognizedPoint(.rightEye)
+            let nose = try firstPose.recognizedPoint(.nose)
+            
+            // Check confidence levels - require shoulder and wrist, elbow and head optional
             if leftShoulder.confidence > 0.5 && leftWrist.confidence > 0.5 {
                 // Adaptive transform attempting to correct axis swap / rotation issues.
                 // Heuristic: If bufferWidth > bufferHeight (common for portrait capture returning landscape buffer), swap axes.
@@ -113,14 +118,32 @@ class PoseEstimator: ObservableObject {
                 let shoulderPoint = transformPoint(leftShoulder)
                 let wristPoint = transformPoint(leftWrist)
                 
-                // Check if elbow is also detected with good confidence
+                var detectedPoints: [CGPoint] = [shoulderPoint] // Always start with shoulder
+                
+                // Add elbow if detected with good confidence
                 if leftElbow.confidence > 0.5 {
                     let elbowPoint = transformPoint(leftElbow)
-                    landmarks = [shoulderPoint, elbowPoint, wristPoint]
-                } else {
-                    // Elbow not detected, use just shoulder and wrist
-                    landmarks = [shoulderPoint, wristPoint]
+                    detectedPoints.append(elbowPoint)
                 }
+                
+                // Always add wrist as the next point
+                detectedPoints.append(wristPoint)
+                
+                // Add head landmarks if available for tilt detection
+                if leftEye.confidence > 0.3 && rightEye.confidence > 0.3 {
+                    let leftEyePoint = transformPoint(leftEye)
+                    let rightEyePoint = transformPoint(rightEye)
+                    detectedPoints.append(leftEyePoint)
+                    detectedPoints.append(rightEyePoint)
+                    
+                    // Add nose if available for additional head reference
+                    if nose.confidence > 0.3 {
+                        let nosePoint = transformPoint(nose)
+                        detectedPoints.append(nosePoint)
+                    }
+                }
+                
+                landmarks = detectedPoints
 
                 // Structured debug logging every ~30 frames
                 debugCounter += 1
@@ -131,14 +154,29 @@ class PoseEstimator: ObservableObject {
                     print("    Raw Shoulder(x: \(String(format: "%.3f", rawShoulder.x)), y: \(String(format: "%.3f", rawShoulder.y))) → Transformed(x: \(String(format: "%.3f", shoulderPoint.x)), y: \(String(format: "%.3f", shoulderPoint.y)))")
                     print("    Raw Wrist(x: \(String(format: "%.3f", rawWrist.x)), y: \(String(format: "%.3f", rawWrist.y))) → Transformed(x: \(String(format: "%.3f", wristPoint.x)), y: \(String(format: "%.3f", wristPoint.y)))")
                     
+                    var detectionMode = "Shoulder+Wrist"
                     if leftElbow.confidence > 0.5 {
+                        detectionMode = "3-point (S+E+W)"
                         let rawElbow = leftElbow.location
                         let elbowPoint = transformPoint(leftElbow)
                         print("    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))")
-                        print("    Using 3-point detection: Shoulder → Elbow → Wrist")
-                    } else {
-                        print("    Using 2-point detection: Shoulder → Wrist (elbow confidence: \(String(format: "%.2f", leftElbow.confidence)))")
                     }
+                    
+                    if leftEye.confidence > 0.3 && rightEye.confidence > 0.3 {
+                        detectionMode += "+Head"
+                        let leftEyePoint = transformPoint(leftEye)
+                        let rightEyePoint = transformPoint(rightEye)
+                        
+                        // Calculate head tilt angle for debug
+                        let eyeDeltaX = rightEyePoint.x - leftEyePoint.x
+                        let eyeDeltaY = rightEyePoint.y - leftEyePoint.y
+                        let headTiltRadians = atan2(eyeDeltaY, eyeDeltaX)
+                        let headTiltDegrees = headTiltRadians * 180.0 / Double.pi
+                        
+                        print("    Head tilt: \(String(format: "%.1f", headTiltDegrees))° (0° = level head)")
+                    }
+                    
+                    print("    Detection mode: \(detectionMode)")
                 }
             }
             

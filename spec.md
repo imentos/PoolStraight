@@ -12,9 +12,11 @@ Right-handed only (MVP)
 3. Core Features
 3.1 Real-Time Pose Detection
 
-Track elbow, wrist, and cue tip using pose estimation.
+Track shoulder, elbow (optional), wrist, and head position using pose estimation.
 
-Feedback is given only when all key points are visible.
+Head tilt monitoring ensures proper eye alignment with the strike plane.
+
+Feedback is given only when key arm points are visible; head detection enhances accuracy when available.
 
 Front-facing camera used for a mirror-style view.
 
@@ -22,19 +24,25 @@ Detection starts automatically when the live camera feed opens.
 
 3.2 Visual Feedback
 
-Overlay lines: elbow → wrist → cue tip.
+Overlay lines: shoulder → elbow → wrist (primary cue alignment).
+
+Head level indicator: eye-to-eye line shows head tilt status.
 
 Fixed center line overlay on the table for aiming.
 
 Color indicators:
 
-Green line when aligned within ±5° deviation
+Green line when arm aligned within threshold and head level
 
-Red line when misaligned
+Red line when arm misaligned or head significantly tilted
+
+Cyan line for head level indicator when properly positioned
+
+Orange line for head tilt warning
 
 Joint points highlighted when detected.
 
-Feedback is continuous while the player is correctly lined up.
+Feedback is continuous while the player maintains proper alignment.
 
 3.3 Audio Feedback
 
@@ -73,21 +81,27 @@ AVFoundation for live camera feed
 
 4.2 Pose Estimation
 
-MediaPipe Pose or similar library
+Apple Vision framework with VNDetectHumanBodyPoseRequest
 
-Detect elbow, wrist, and cue tip
+Detect shoulder, elbow (optional), wrist, and head landmarks (eyes, nose)
 
 Calculate angle deviation against the fixed center line
 
+Monitor head tilt for proper eye alignment with strike plane
+
 4.3 Alignment Logic
 
-Capture coordinates of elbow → wrist → cue tip.
+Capture coordinates of shoulder → elbow → wrist for cue alignment.
 
-Compare line formed by these points to fixed center line.
+Monitor head tilt using eye positions to ensure level head position.
 
-Compute angular deviation; threshold ±5° for green/red feedback.
+Adaptive detection: uses 2-point (shoulder-wrist) when elbow not visible, 3-point when all detected.
 
-Provide visual/audio feedback in real time.
+Compare arm line to fixed center line with configurable sensitivity thresholds.
+
+Head tilt threshold: ±6° to ±15° depending on skill level.
+
+Combine arm alignment and head position for overall feedback.
 
 4.4 UI/UX
 
