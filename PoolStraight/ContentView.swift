@@ -18,6 +18,8 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
                 CameraView(session: cameraService.session)
                     .ignoresSafeArea()
                 
+                // TODO: Add sensitivity controls to settings screen later
+                /*
                 // Sensitivity adjustment controls (for testing/fine-tuning)
                 VStack {
                     Spacer()
@@ -73,6 +75,7 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
                         .padding(.bottom, 40)
                     }
                 }
+                */
                 
                 // Overlay for pose visualization (placed AFTER buttons so it doesn't block them)
                 OverlayView(
