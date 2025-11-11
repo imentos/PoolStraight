@@ -3,12 +3,49 @@ import CoreGraphics
 
 struct AlignmentLogic {
     
+    // MARK: - Configurable Sensitivity Parameters
+    
+    /// Alignment sensitivity levels for different skill levels
+    enum SensitivityLevel {
+        case beginner    // More forgiving - good for learning
+        case intermediate // Moderate precision
+        case advanced    // Strict precision for competitive play
+        
+        var angleThreshold: Double {
+            switch self {
+            case .beginner: return 12.0      // ±12 degrees
+            case .intermediate: return 8.0   // ±8 degrees  
+            case .advanced: return 5.0       // ±5 degrees
+            }
+        }
+        
+        var lateralThreshold: CGFloat {
+            switch self {
+            case .beginner: return 0.12      // ±12% of screen width
+            case .intermediate: return 0.08  // ±8% of screen width
+            case .advanced: return 0.05      // ±5% of screen width
+            }
+        }
+        
+        var wristWeight: CGFloat {
+            switch self {
+            case .beginner: return 0.6       // Less wrist emphasis for beginners
+            case .intermediate: return 0.7   // Balanced
+            case .advanced: return 0.8       // High wrist emphasis for precision
+            }
+        }
+    }
+    
+    // Current sensitivity level - can be adjusted during testing
+    static var currentSensitivity: SensitivityLevel = .beginner
+    
     /// Calculates alignment status based on elbow and wrist positions relative to center line
     /// - Parameters:
     ///   - points: Array containing elbow (index 0) and wrist (index 1) coordinates (normalized 0-1)
     ///   - centerLineX: X-coordinate of the center line (normalized, typically 0.5)
+    ///   - sensitivity: Optional sensitivity override
     /// - Returns: AlignmentStatus indicating if the arm alignment is correct
-    static func calculateAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5) -> AlignmentStatus {
+    static func calculateAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5, sensitivity: SensitivityLevel? = nil) -> AlignmentStatus {
         
         // Check if we have at least two points (elbow and wrist)
         guard points.count >= 2 else {
@@ -23,25 +60,35 @@ struct AlignmentLogic {
             return .notDetected
         }
         
-        // Use combined approach: both angle and lateral deviation
-        let angleAlignment = calculateAngleAlignment(elbow: elbow, wrist: wrist)
-        let lateralAlignment = calculateLateralAlignment(elbow: elbow, wrist: wrist, centerLineX: centerLineX)
+        // Use provided sensitivity or default
+        let activeSensitivity = sensitivity ?? currentSensitivity
         
-        // Both conditions must be met for perfect alignment
-        if angleAlignment == .aligned && lateralAlignment == .aligned {
+        // Use combined approach: both angle and lateral deviation
+        let angleAlignment = calculateAngleAlignment(elbow: elbow, wrist: wrist, sensitivity: activeSensitivity)
+        let lateralAlignment = calculateLateralAlignment(elbow: elbow, wrist: wrist, centerLineX: centerLineX, sensitivity: activeSensitivity)
+        
+        // For billiard training, prioritize angle over lateral position
+        // This matches real-world billiard technique where arm angle is more critical
+        switch (angleAlignment, lateralAlignment) {
+        case (.aligned, .aligned):
             return .aligned
-        } else {
+        case (.aligned, .misaligned):
+            // Good angle but off-center - still provide some positive feedback for beginners
+            return activeSensitivity == .beginner ? .aligned : .misaligned
+        case (.misaligned, _):
             return .misaligned
+        case (.notDetected, _), (_, .notDetected):
+            return .notDetected
         }
     }
     
-    private static func calculateAngleAlignment(elbow: CGPoint, wrist: CGPoint) -> AlignmentStatus {
+    private static func calculateAngleAlignment(elbow: CGPoint, wrist: CGPoint, sensitivity: SensitivityLevel) -> AlignmentStatus {
         // Calculate angle of the line formed by elbow and wrist
         let deltaY = wrist.y - elbow.y
         let deltaX = wrist.x - elbow.x
         
         // Ensure wrist is below elbow (proper positioning for billiard stance)
-        guard deltaY > 0 else {
+        guard deltaY > 0.02 else { // Small threshold to avoid noise
             return .misaligned
         }
         
@@ -62,27 +109,34 @@ struct AlignmentLogic {
         // Convert to degrees for easier threshold checking
         let angleDifferenceInDegrees = angleDifference * 180.0 / Double.pi
         
-        // More forgiving threshold for real pose detection (±8 degrees instead of 5)
-        // Real human pose detection has more variance than mock data
-        let alignmentThreshold: Double = 8.0
+        // Use sensitivity-based threshold
+        let alignmentThreshold = sensitivity.angleThreshold
+        
+        // Debug logging for fine-tuning
+        if angleDifferenceInDegrees > alignmentThreshold {
+            print("🎯 Angle deviation: \(String(format: "%.1f", angleDifferenceInDegrees))° (threshold: \(alignmentThreshold)°)")
+        }
         
         return angleDifferenceInDegrees <= alignmentThreshold ? .aligned : .misaligned
     }
     
-    private static func calculateLateralAlignment(elbow: CGPoint, wrist: CGPoint, centerLineX: CGFloat) -> AlignmentStatus {
+    private static func calculateLateralAlignment(elbow: CGPoint, wrist: CGPoint, centerLineX: CGFloat, sensitivity: SensitivityLevel) -> AlignmentStatus {
         // For billiard stance, the wrist position is most important for cue alignment
-        // We'll weight the wrist position more heavily than the elbow
-        let elbowWeight: CGFloat = 0.3
-        let wristWeight: CGFloat = 0.7
+        let elbowWeight = 1.0 - sensitivity.wristWeight
+        let wristWeight = sensitivity.wristWeight
         
         let weightedX = (elbow.x * elbowWeight) + (wrist.x * wristWeight)
         
         // Calculate lateral deviation from center line
         let lateralDeviation = abs(weightedX - centerLineX)
         
-        // More forgiving threshold for real pose detection (±0.08 = 8% of screen width)
-        // Real human pose detection needs more tolerance than mock data
-        let lateralThreshold: CGFloat = 0.08
+        // Use sensitivity-based threshold
+        let lateralThreshold = sensitivity.lateralThreshold
+        
+        // Debug logging for fine-tuning
+        if lateralDeviation > lateralThreshold {
+            print("🎯 Lateral deviation: \(String(format: "%.3f", lateralDeviation)) (threshold: \(lateralThreshold))")
+        }
         
         return lateralDeviation <= lateralThreshold ? .aligned : .misaligned
     }
@@ -91,7 +145,35 @@ struct AlignmentLogic {
         return point.x >= 0 && point.x <= 1 && point.y >= 0 && point.y <= 1
     }
     
-    /// Legacy method for simpler lateral-only alignment
+    // MARK: - Sensitivity Adjustment Methods
+    
+    /// Adjust sensitivity based on user performance or preference
+    static func setSensitivity(_ level: SensitivityLevel) {
+        currentSensitivity = level
+        print("🎯 Alignment sensitivity set to: \(level)")
+    }
+    
+    /// Get current sensitivity parameters for debugging
+    static func getCurrentSensitivityInfo() -> (angle: Double, lateral: CGFloat, wristWeight: CGFloat) {
+        return (
+            angle: currentSensitivity.angleThreshold,
+            lateral: currentSensitivity.lateralThreshold,
+            wristWeight: currentSensitivity.wristWeight
+        )
+    }
+    
+    /// Test method to evaluate alignment with all sensitivity levels
+    static func testAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5) -> [SensitivityLevel: AlignmentStatus] {
+        var results: [SensitivityLevel: AlignmentStatus] = [:]
+        
+        for level in [SensitivityLevel.beginner, .intermediate, .advanced] {
+            results[level] = calculateAlignment(points: points, centerLineX: centerLineX, sensitivity: level)
+        }
+        
+        return results
+    }
+    
+    /// Legacy method for simpler lateral-only alignment (kept for compatibility)
     static func calculateLateralAlignment(points: [CGPoint], centerLineX: CGFloat = 0.5) -> AlignmentStatus {
         
         guard points.count >= 2 else {

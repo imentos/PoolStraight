@@ -9,6 +9,7 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
     @State private var detectedPoints: [CGPoint] = []
     @State private var alignmentStatus: AlignmentStatus = .notDetected
     @State private var previousAlignmentStatus: AlignmentStatus = .notDetected
+    @State private var currentSensitivity: AlignmentLogic.SensitivityLevel = .beginner // Track UI state
     
     var body: some View {
         GeometryReader { geometry in
@@ -17,15 +18,70 @@ struct ContentView: View, CameraServiceDelegate, PoseEstimatorDelegate {
                 CameraView(session: cameraService.session)
                     .ignoresSafeArea()
                 
-                // Overlay for pose visualization
+                // Sensitivity adjustment controls (for testing/fine-tuning)
+                VStack {
+                    Spacer()
+                    
+                    HStack {
+                        Spacer()
+                        
+                        VStack {
+                            Text("Sensitivity")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.7))
+                                .cornerRadius(8)
+                            
+                            VStack(spacing: 4) {
+                                Button("Easy") {
+                                    AlignmentLogic.setSensitivity(.beginner)
+                                    currentSensitivity = .beginner
+                                }
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(currentSensitivity == .beginner ? Color.green : Color.gray.opacity(0.7))
+                                .cornerRadius(6)
+                                
+                                Button("Medium") {
+                                    AlignmentLogic.setSensitivity(.intermediate)
+                                    currentSensitivity = .intermediate
+                                }
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(currentSensitivity == .intermediate ? Color.green : Color.gray.opacity(0.7))
+                                .cornerRadius(6)
+                                
+                                Button("Hard") {
+                                    AlignmentLogic.setSensitivity(.advanced)
+                                    currentSensitivity = .advanced
+                                }
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(currentSensitivity == .advanced ? Color.green : Color.gray.opacity(0.7))
+                                .cornerRadius(6)
+                            }
+                        }
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 40)
+                    }
+                }
+                
+                // Overlay for pose visualization (placed AFTER buttons so it doesn't block them)
                 OverlayView(
                     detectedPoints: detectedPoints,
                     alignmentStatus: alignmentStatus,
                     geometryProxy: geometry
                 )
                 .ignoresSafeArea()
-                
-                // Removed start/stop button and not detected banner per user request
+                .allowsHitTesting(false) // This should prevent the overlay from intercepting touches
             }
         }
         .onAppear {
