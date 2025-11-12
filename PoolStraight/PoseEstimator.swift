@@ -164,20 +164,6 @@ class PoseEstimator: ObservableObject {
                 // Always add wrist as the next point
                 detectedPoints.append(wristPoint)
                 
-                // Add head landmarks if available for tilt detection
-                if leftEye.confidence > 0.3 && rightEye.confidence > 0.3 {
-                    let leftEyePoint = transformPoint(leftEye)
-                    let rightEyePoint = transformPoint(rightEye)
-                    detectedPoints.append(leftEyePoint)
-                    detectedPoints.append(rightEyePoint)
-                    
-                    // Add nose if available for additional head reference
-                    if nose.confidence > 0.3 {
-                        let nosePoint = transformPoint(nose)
-                        detectedPoints.append(nosePoint)
-                    }
-                }
-                
                 landmarks = detectedPoints
 
                 // Enhanced debug logging for billiard stance
@@ -205,20 +191,6 @@ class PoseEstimator: ObservableObject {
                         let rawElbow = leftElbow.location
                         let elbowPoint = transformPoint(leftElbow)
                         print("    Raw Elbow(x: \(String(format: "%.3f", rawElbow.x)), y: \(String(format: "%.3f", rawElbow.y))) → Transformed(x: \(String(format: "%.3f", elbowPoint.x)), y: \(String(format: "%.3f", elbowPoint.y)))")
-                    }
-                    
-                    if leftEye.confidence > 0.3 && rightEye.confidence > 0.3 {
-                        detectionMode += "+Head"
-                        let leftEyePoint = transformPoint(leftEye)
-                        let rightEyePoint = transformPoint(rightEye)
-                        
-                        // Calculate head tilt angle for debug
-                        let eyeDeltaX = rightEyePoint.x - leftEyePoint.x
-                        let eyeDeltaY = rightEyePoint.y - leftEyePoint.y
-                        let headTiltRadians = atan2(eyeDeltaY, eyeDeltaX)
-                        let headTiltDegrees = headTiltRadians * 180.0 / Double.pi
-                        
-                        print("    Head tilt: \(String(format: "%.1f", headTiltDegrees))° (0° = level head)")
                     }
                     
                     print("    Detection mode: \(detectionMode)")
